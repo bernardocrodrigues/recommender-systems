@@ -8,6 +8,7 @@ from typing import Optional
 from tempfile import TemporaryDirectory
 
 from pattern_mining.binaps.binaps_wrapper import run_binaps, get_patterns_from_weights
+from pattern_mining.formal_concept_analysis import create_concept
 from dataset.binary_dataset import (
     load_binary_dataset_from_trainset,
     save_as_binaps_compatible_input,
@@ -48,7 +49,7 @@ class BinaPsKNNRecommender(BiAKNN):
         )
         assert (
             isinstance(dataset_binarization_threshold, float)
-            and 0 < dataset_binarization_threshold <= 1
+            and 0 < dataset_binarization_threshold
         )
 
         super().__init__(
@@ -72,11 +73,6 @@ class BinaPsKNNRecommender(BiAKNN):
             self.trainset, threshold=self.dataset_binarization_threshold
         )
 
-        hidden_dimension_neurons_number = (
-            -1
-            if self.hidden_dimension_neurons_number is None
-            else self.hidden_dimension_neurons_number
-        )
 
         with TemporaryDirectory() as temporary_directory:
             with open(f"{temporary_directory}/dataset", "w+", encoding="UTF-8") as file_object:
@@ -85,7 +81,12 @@ class BinaPsKNNRecommender(BiAKNN):
                 weights, _, _ = run_binaps(
                     input_dataset_path=file_object.name,
                     epochs=self.epochs,
-                    hidden_dimension=hidden_dimension_neurons_number,
+                    hidden_dimension=self.hidden_dimension_neurons_number,
                 )
 
-        self.biclusters = get_patterns_from_weights(weights, self.weights_binarization_threshold)
+        patterns = get_patterns_from_weights(weights, self.weights_binarization_threshold)
+
+        self.biclusters = []
+        for pattern in patterns:
+            concept = create_concept([], pattern)
+            self.biclusters.append(concept)

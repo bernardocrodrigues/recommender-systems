@@ -78,12 +78,12 @@ def load_ml_100k_folds(predefined: bool = True):
             for i in (1, 2, 3, 4, 5)
         ]
         data = Dataset.load_from_folds(folds_files, reader=Reader("ml-100k"))
-        kf = PredefinedKFold()
+        k_fold = PredefinedKFold()
     else:
         data = Dataset.load_from_file(str(MOVIELENS_100K_PATH / "u.data"), reader=Reader("ml-100k"))
-        kf = KFold(n_splits=5)
+        k_fold = KFold(n_splits=5)
 
-    return [(index, fold) for index, fold in enumerate(kf.split(data))]
+    return data, k_fold
 
 
 def load_ml_1m_folds():
@@ -94,6 +94,10 @@ def load_ml_1m_folds():
     download_movielens(MOVIELENS_1M_PATH, "1m")
 
     data = Dataset.load_from_file(str(MOVIELENS_1M_PATH / "ratings.dat"), reader=Reader("ml-1m"))
-    kf = KFold(n_splits=5)
+    k_fold = KFold(n_splits=5)
 
-    return [(index, fold) for index, fold in enumerate(kf.split(data))]
+    return data, k_fold
+
+
+def resolve_folds(data, k_fold):
+    return list((index, fold) for index, fold in enumerate(k_fold.split(data)))

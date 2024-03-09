@@ -5,6 +5,7 @@ This module implements all the functions used to plot the results of the benchma
 Copyright 2023 Bernardo C. Rodrigues
 See LICENSE file for license details
 """
+
 import itertools
 import multiprocessing
 from typing import Tuple, List
@@ -22,8 +23,19 @@ from .threads import RecommenderVariation, generic_benchmark_thread
 DPI = 300
 WIDTH = 1200
 HEIGHT = 800
-FORMAT = "png"
+FORMAT = "jpg"
 
+METRIC_NAMES = {
+    "mae": "MAE",
+    "rmse": "RMSE",
+    "fit_time": "Fit Elapsed Time (s)",
+    "test_time": "Test Elapsed (s)",
+    "precision_at_k": "Precision@20",
+    "recall_at_k": "Recall@20",
+    "mean_bicluster_size": "Mean Formal Concept Size",
+    "mean_bicluster_intent": "Mean Intent",
+    "mean_bicluster_extent": "Mean Extent",
+}
 
 pd.set_option("display.expand_frame_repr", False)
 
@@ -40,7 +52,7 @@ def customize_default_template():
 
     # Customize font settings
     default_template.layout.font.family = "Latin Modern"
-    default_template.layout.font.size = 16
+    default_template.layout.font.size = 22
     default_template.layout.font.color = "black"
 
     # Customize margin and width
@@ -270,7 +282,7 @@ def calculate_boxplot_values(series: List[float]):
 
     assert isinstance(series, list)
     assert len(series) > 0
-    assert all(isinstance(element, float) or isinstance(element, int)  for element in series)
+    assert all(isinstance(element, float) or isinstance(element, int) for element in series)
 
     q_1 = np.percentile(series, 25)
     q_3 = np.percentile(series, 75)
@@ -304,19 +316,25 @@ def plot_metric_box_plot(metric_name: str, concatenated_results: dict):
         )
 
     fig.update_layout(
-        yaxis_title=metric_name.upper(),
-        xaxis_title="Recommender",
-        width=600,
+        yaxis_title=(
+            METRIC_NAMES[metric_name] if metric_name in METRIC_NAMES else metric_name.upper()
+        ),
+        xaxis_title="GreConD coverage 𝐺𝑐𝑜𝑣",
+        width=800,
         height=400,
-        margin_l=60,
-        margin_r=100,
-        margin_b=100,
+        margin_l=90,
+        margin_b=80,
+        margin_r=80,
     )
 
+    # margin_l=60,
+    # margin_r=100,
+
     fig.show()
+    fig.write_image(f"{metric_name}_boxplot.{FORMAT}", scale=3)
 
 
-def get_result_table(metric_name:str, concatenated_results: dict):
+def get_result_table(metric_name: str, concatenated_results: dict):
     """
     Get a table with the results for a given metric.
 
@@ -328,34 +346,21 @@ def get_result_table(metric_name:str, concatenated_results: dict):
     for recommender_name, metric_results in concatenated_results.items():
         metric_data = metric_results[metric_name]
         mean = np.mean(metric_data)
-        median = np.median(metric_data)
         standard_deviation = np.std(metric_data)
-        variance = np.var(metric_data)
-        skewness = scipy.stats.skew(metric_data)
-        kurtosis = scipy.stats.kurtosis(metric_data)
         min_val = np.min(metric_data)
         max_val = np.max(metric_data)
-        Q1, Q3, lower_fence, upper_fence = calculate_boxplot_values(metric_data)
 
         results.append(
             {
                 "Recommender": recommender_name,
                 "Mean": mean,
-                "Standard Deviation": standard_deviation,
-                "Variance": variance,
+                "σ": standard_deviation,
                 "Min": min_val,
                 "Max": max_val,
-                "Median": median,
-                "Q1": Q1,
-                "Q3": Q3,
-                "Lower Fence": lower_fence,
-                "Upper Fence": upper_fence,
-                "Skewness": skewness,
-                "Kurtosis": kurtosis,
             }
         )
 
-    return pd.DataFrame(results)
+    return pd.DataFrame(results).to_latex(index=False, float_format="%.3f")
 
 
 def get_latex_table_from_pandas_table(pandas_table: pd.DataFrame):

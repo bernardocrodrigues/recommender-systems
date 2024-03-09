@@ -141,7 +141,7 @@ def run_binaps(
     weight_decay: Annotated[float, Field(ge=0)] = 0,
     gamma: Annotated[float, Field(ge=0)] = 0.1,
     seed: int = 1,
-    hidden_dimension: Optional[Annotated[int, Field(gt=0)]] = 1,
+    hidden_dimension: Optional[Annotated[int, Field(gt=0)]] = None,
 ):
     """
     Run the Binaps algorithm on a given dataset.
@@ -157,7 +157,9 @@ def run_binaps(
         weight_decay (float): Weight decay for optimization (default: 0).
         gamma (float): Gamma value for optimization (default: 0.1).
         seed (int): Random seed for reproducibility (default: 1).
-        hidden_dimension (int): Hidden dimension for the Binaps algorithm (default: -1).
+        hidden_dimension (int): Hidden dimension for the NN. If None, the number of neurons in the
+                                hidden layer will be equal to the number of columns in the dataset
+                                (default: None).
 
     Returns:
         Tuple[torch.Tensor, List[float], List[float]]: A tuple containing weights,
@@ -181,13 +183,15 @@ def run_binaps(
     else:
         device = torch.device("cpu")
 
+    hidden_dimension_arg = -1 if hidden_dimension is None else hidden_dimension
+
     weights, training_losses, test_losses = learn(
         input_dataset_path,
         learning_rate,
         gamma,
         weight_decay,
         epochs,
-        hidden_dimension,
+        hidden_dimension_arg,
         train_set_size,
         batch_size,
         test_batch_size,

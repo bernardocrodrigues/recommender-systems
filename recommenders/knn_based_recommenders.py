@@ -51,8 +51,6 @@ def merge_biclusters(
 
     assert len(biclusters) > 0
     assert all(isinstance(bicluster, Concept) for bicluster in biclusters)
-    assert all(bicluster.extent.size > 0 for bicluster in biclusters)
-    assert all(bicluster.intent.size > 0 for bicluster in biclusters)
 
     new_bicluster_extent = np.array([], dtype=np.int64)
     new_bicluster_intent = np.array([], dtype=np.int64)
@@ -548,6 +546,10 @@ class BiAKNN(AlgoBase, ABC):
         self.compute_biclusters_from_trainset()
 
         self._apply_filters()
+
+        if not self.number_of_top_k_biclusters:
+            self.number_of_top_k_biclusters = len(self.biclusters)
+
         self._generate_neighborhood()
         self._calculate_means()
         self._instantiate_similarity_matrix()
@@ -579,9 +581,6 @@ class BiAKNN(AlgoBase, ABC):
                 self.dataset, self.biclusters, self.minimum_bicluster_relative_size
             )
 
-        if not self.number_of_top_k_biclusters:
-            self.number_of_top_k_biclusters = len(self.biclusters)
-
     def _generate_neighborhood(self) -> None:
         """
         Generates the neighborhood for each user based on the dataset and biclusters.
@@ -595,11 +594,13 @@ class BiAKNN(AlgoBase, ABC):
                 self.dataset[user_id], self.user_binarization_threshold
             )
 
-            top_k_biclusters = get_top_k_biclusters_for_user(
-                self.biclusters, user_as_tidset, self.number_of_top_k_biclusters
-            )
-
-            merged_bicluster = merge_biclusters(top_k_biclusters)
+            merged_bicluster = create_concept([], [])
+            if self.number_of_top_k_biclusters:
+                top_k_biclusters = get_top_k_biclusters_for_user(
+                    self.biclusters, user_as_tidset, self.number_of_top_k_biclusters
+                )
+                if top_k_biclusters:
+                    merged_bicluster = merge_biclusters(top_k_biclusters)
 
             if self.knn_type == "user":
                 neighborhood = merged_bicluster.extent
@@ -651,7 +652,7 @@ class BiAKNN(AlgoBase, ABC):
         user_neighborhood = np.setdiff1d(user_neighborhood, main_index)
 
         if user_neighborhood.size == 0:
-            return self.means[main_index], {"actual_k": 0}
+            raise PredictionImpossible("Not enough neighbors.")
 
         compute_neighborhood_cosine_similarity(
             dataset, self.similarity_matrix, main_index, user_neighborhood
@@ -668,7 +669,7 @@ class BiAKNN(AlgoBase, ABC):
         )
 
         if k_top_neighbors_ratings.size == 0:
-            return self.means[main_index], {"actual_k": 0}
+            raise PredictionImpossible("Not enough neighbors.")
 
         prediction = calculate_weighted_rating(
             self.means[main_index],
