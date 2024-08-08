@@ -456,12 +456,12 @@ def count_impossible_predictions(predictions: List[Prediction]) -> int:
 
 def get_ndcg_at_k(predictions, threshold=1, k=20) -> float:
     """
-    Calculate the Normalized Discounted Cumulative Gain (NDCG) at K for a list of predictions.
+    Calculate the Normalized Discounted Cumulative Gain (nDCG) at K for a list of predictions.
 
-    NDCG is a measure of ranking quality. It is a measure of how well the recommendations are
-    ranked, with higher values indicating better rankings. NDCG is defined as:
+    nDCG is a measure of ranking quality. It is a measure of how well the recommendations are
+    ranked, with higher values indicating better rankings. nDCG is defined as:
 
-        NDCG = DCG / IDCG
+        nDCG = DCG / IDCG
 
     Where DCG (Discounted Cumulative Gain) is the sum of the relevance scores of the top K
     recommendations, discounted by their position in the ranking. The DCG is defined as:
@@ -479,9 +479,9 @@ def get_ndcg_at_k(predictions, threshold=1, k=20) -> float:
     Where rel_i is the relevance of the i-th recommendation and n is the total number of
     recommendations.
 
-    Finally, the NDCG at K is defined as:
+    Finally, the nDCG at K is defined as:
 
-        NDCG = DCG / IDCG
+        nDCG = DCG / IDCG
 
     Args:
         predictions (List[Prediction]): A list of predictions.
@@ -490,7 +490,7 @@ def get_ndcg_at_k(predictions, threshold=1, k=20) -> float:
         k (int, optional): The number of recommendations to consider. Defaults to 20.
 
     Returns:
-        float: The NDCG at K.
+        float: The nDCG at K.
     """
 
     def relevant(prediction):
@@ -509,23 +509,26 @@ def get_ndcg_at_k(predictions, threshold=1, k=20) -> float:
     for prediction in predictions:
         predictions_per_user[prediction.uid].append(prediction)
 
-    ndcgs = set()
+    nDCGs = set()
     for user_predictions in predictions_per_user.values():
         if len(user_predictions) < k:
             # skip this user if there are not enough recommendations to reach k
             continue
 
-        user_predictions.sort(key=lambda prediction: prediction.est, reverse=True)
+        user_predictions_by_est = sorted(user_predictions, key=lambda prediction: prediction.est, reverse=True)
+        top_k_ratings = user_predictions_by_est[:k]
 
-        if user_predictions[k - 1].est < threshold:
-            # skip this user if the k-th item is not relevant
-            continue
+        DCG = dcg(top_k_ratings)
 
-        top_k_ratings = user_predictions[:k]
+        user_predictions_by_r_ui = sorted(user_predictions, key=lambda prediction: prediction.r_ui, reverse=True)
+        IDCG = dcg(user_predictions_by_r_ui[:k])
 
-        ndcgs.add(dcg(top_k_ratings) / dcg(user_predictions))
+        try:
+            nDCGs.add(DCG / IDCG)
+        except ZeroDivisionError:
+            nDCGs.add(0)
 
     try:
-        return statistics.mean(ndcgs)
+        return statistics.mean(nDCGs)
     except statistics.StatisticsError:
         return 0
